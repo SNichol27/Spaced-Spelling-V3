@@ -58,13 +58,14 @@ export async function GET(
       ? React.createElement(AnswerKeyDocument, {
           listName: listRow.name,
           generatedAt: worksheet.generatedAt,
-          questions: worksheet.questions
+          questions: worksheet.questions,
+          matching: worksheet.matching
         })
       : React.createElement(WorksheetDocument, {
           listName: listRow.name,
           generatedAt: worksheet.generatedAt,
           questions: worksheet.questions,
-          definitions: worksheet.definitions
+          matching: worksheet.matching
         });
 
   const pdfStream = await renderToStream(document as React.ReactElement);

@@ -1,7 +1,6 @@
 import OpenAI from 'openai';
-import { env } from '@/lib/env';
-
-const openai = env.openAiApiKey ? new OpenAI({ apiKey: env.openAiApiKey }) : null;
+const apiKey = process.env.OPENAI_API_KEY;
+const openai = apiKey ? new OpenAI({ apiKey }) : null;
 
 export async function generateDefinition(word: string): Promise<string> {
   if (!openai) {

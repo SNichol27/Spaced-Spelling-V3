@@ -19,11 +19,13 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { data: listRow, error: listError } = await supabase
+  const { data: listRowRaw, error: listError } = await supabase
     .from('spelling_lists')
     .select('id, name, class_id')
     .eq('id', context.params.listId)
     .single();
+
+  const listRow = listRowRaw as { id: string; name: string; class_id: string } | null;
 
   if (listError || !listRow) {
     return NextResponse.json({ error: 'List not found' }, { status: 404 });
@@ -65,7 +67,7 @@ export async function GET(
           definitions: worksheet.definitions
         });
 
-  const pdfStream = await renderToStream(document);
+  const pdfStream = await renderToStream(document as React.ReactElement);
 
   return new NextResponse(pdfStream as unknown as BodyInit, {
     headers: {

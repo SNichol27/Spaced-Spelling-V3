@@ -71,6 +71,7 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
     (review) => review.status === 'pending' && review.scheduled_week > currentWeek
   );
   const completedReviews = (reviewsResult.data ?? []).filter((review) => review.status === 'completed');
+  void upcomingReviews;
 
   return (
     <main className="mx-auto max-w-7xl space-y-6 px-4 py-6">
@@ -184,22 +185,22 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
           <section className="card p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-lg font-semibold text-slate-900">Review Queue</h2>
-              <form className="flex items-center gap-2">
-                <input type="hidden" name="classId" value={selectedClassId ?? ''} />
-                <label className="text-sm text-slate-600">Current week</label>
-                <input
-                  type="number"
-                  name="week"
-                  min={1}
-                  max={40}
-                  defaultValue={currentWeek}
-                  className="w-20 rounded border border-slate-300 px-2 py-1 text-sm"
-                />
-                <button className="rounded border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100">Apply</button>
-              </form>
+              <div className="flex items-center gap-2">
+                <form>
+                  <input type="hidden" name="classId" value={selectedClassId ?? ''} />
+                  <input type="hidden" name="week" value={Math.max(1, currentWeek - 1)} />
+                  <button className="rounded border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100">Previous Week</button>
+                </form>
+                <p className="min-w-20 text-center text-sm font-medium text-slate-700">Week {currentWeek}</p>
+                <form>
+                  <input type="hidden" name="classId" value={selectedClassId ?? ''} />
+                  <input type="hidden" name="week" value={Math.min(40, currentWeek + 1)} />
+                  <button className="rounded border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100">Next Week</button>
+                </form>
+              </div>
             </div>
 
-            <div className="mt-4 grid gap-4 xl:grid-cols-3">
+            <div className="mt-4 grid gap-4 xl:grid-cols-2">
               <ReviewColumn
                 title="Due"
                 reviews={dueReviews}
@@ -207,7 +208,6 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
                 action={markReviewCompleteAction}
                 buttonLabel="Mark Complete"
               />
-              <ReviewColumn title="Upcoming" reviews={upcomingReviews} listNameById={listNameById} />
               <ReviewColumn title="Completed" reviews={completedReviews} listNameById={listNameById} />
             </div>
           </section>

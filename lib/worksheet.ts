@@ -47,6 +47,9 @@ function swapAt(word: string, index: number, replacement: string) {
 }
 
 export function generatePhoneticMisspellings(word: string): string[] {
+  if (!word) {
+    return [];
+  }
   const misspellings = new Set<string>();
   const lowerWord = word.toLowerCase().trim();
 
@@ -142,20 +145,27 @@ export function generatePhoneticMisspellings(word: string): string[] {
   return shuffle(Array.from(misspellings)).slice(0, 3);
 }
 
+const OPENAI_FETCH_TIMEOUT_MS = 8000;
+
 export async function getDefinition(word: string, openAiKey: string): Promise<string> {
   if (!openAiKey) {
+    console.warn('[OPENAI_CONFIG_MISSING] OPENAI_API_KEY not set; skipping AI definition generation');
     return fallbackDefinition;
   }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), OPENAI_FETCH_TIMEOUT_MS);
 
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
+      signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
         Authorization: ['Bearer', openAiKey].join(' ')
       },
       body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
+        model: 'gpt-4o-mini',
         messages: [
           {
             role: 'system',
@@ -173,31 +183,45 @@ export async function getDefinition(word: string, openAiKey: string): Promise<st
     });
 
     if (!response.ok) {
+      console.warn('[OPENAI_API_ERROR] OpenAI request failed', { word, status: response.status });
       return fallbackDefinition;
     }
 
     const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
     const definition = data.choices?.[0]?.message?.content?.replace(/^["']|["']$/g, '').trim();
     return definition || fallbackDefinition;
-  } catch {
+  } catch (err) {
+    const isTimeout = err instanceof Error && err.name === 'AbortError';
+    console.warn(isTimeout ? '[OPENAI_TIMEOUT]' : '[OPENAI_FETCH_ERROR]', 'Definition fetch failed', { word });
     return fallbackDefinition;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
 export async function buildWorksheet(words: WorksheetWord[], openAiKey: string) {
+  if (!openAiKey) {
+    console.warn('[OPENAI_CONFIG_MISSING] OPENAI_API_KEY not configured; worksheet will use stored definitions only');
+  }
+
   const questionSource = shuffle(words);
 
   const questions: WorksheetQuestion[] = await Promise.all(
     questionSource.map(async (item) => {
-      const distractors = generatePhoneticMisspellings(item.word);
-      const options = shuffle([item.word, ...distractors]).slice(0, 4);
-      const generatedDefinition = await getDefinition(item.word, openAiKey);
+      const safeWord = item.word ?? '';
+      const distractors = generatePhoneticMisspellings(safeWord);
+      const options = shuffle([safeWord, ...distractors]).slice(0, 4);
+
+      // Prefer stored definition from DB; only call AI when definition is absent
+      const definition = item.definition?.trim()
+        ? item.definition.trim()
+        : await getDefinition(safeWord, openAiKey);
 
       return {
-        word: item.word,
-        definition: generatedDefinition || item.definition || fallbackDefinition,
+        word: safeWord,
+        definition: definition || fallbackDefinition,
         options,
-        answer: item.word
+        answer: safeWord
       };
     })
   );

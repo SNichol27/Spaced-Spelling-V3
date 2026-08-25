@@ -34,7 +34,7 @@ export function WorksheetDocument({
         <Text style={styles.sectionHeading}>Activity 1: Select Correct Spelling</Text>
         {questions.map((item, index) => (
           <View key={`${item.word}-${index}`} style={styles.line}>
-            <Text>{`${index + 1}. ${item.definition}`}</Text>
+            <Text>{`${index + 1}.`}</Text>
             <View style={styles.options}>
               {item.options.map((option) => (
                 <Text key={`${item.word}-${option}`}>- {option}</Text>

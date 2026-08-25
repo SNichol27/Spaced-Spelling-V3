@@ -12,6 +12,7 @@ import {
 } from './actions';
 import { WorksheetGenerator } from '@/components/worksheet-generator';
 import { ConfirmSubmitButton } from '@/components/confirm-submit-button';
+import { DueReviewItem } from '@/components/due-review-item';
 
 type DashboardProps = {
   searchParams?: {
@@ -201,13 +202,23 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
             </div>
 
             <div className="mt-4 grid gap-4 xl:grid-cols-2">
-              <ReviewColumn
-                title="Due"
-                reviews={dueReviews}
-                listNameById={listNameById}
-                action={markReviewCompleteAction}
-                buttonLabel="Mark Complete"
-              />
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Due</h3>
+                <ul className="mt-2 space-y-2">
+                  {dueReviews.length === 0 ? <li className="text-sm text-slate-500">None</li> : null}
+                  {dueReviews.map((review) => (
+                    <DueReviewItem
+                      key={review.id}
+                      reviewId={review.id}
+                      spellingListId={review.spelling_list_id}
+                      listName={listNameById.get(review.spelling_list_id) ?? 'Spelling List'}
+                      reviewNumber={review.review_number}
+                      scheduledWeek={review.scheduled_week}
+                      action={markReviewCompleteAction}
+                    />
+                  ))}
+                </ul>
+              </div>
               <ReviewColumn title="Completed" reviews={completedReviews} listNameById={listNameById} />
             </div>
           </section>
@@ -216,7 +227,7 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
             <h2 className="text-lg font-semibold text-slate-900">Spelling Lists</h2>
             <ul className="mt-3 space-y-3">
               {(listsResult.data ?? []).map((list) => (
-                <li key={list.id} className="rounded-lg border border-slate-200 p-3">
+                <li key={list.id} data-list-id={list.id} className="rounded-lg border border-slate-200 p-3 transition-shadow duration-300">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="font-medium text-slate-900">{list.name}</p>

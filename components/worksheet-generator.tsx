@@ -9,11 +9,28 @@ type WorksheetQuestion = {
   definition: string;
 };
 
+type LegacyDefinitionEntry = {
+  word: string;
+  definition: string;
+};
+
+type MatchingDefinitionEntry = {
+  letter: string;
+  definition: string;
+};
+
+type MatchingData = {
+  words?: string[];
+  definitions?: MatchingDefinitionEntry[];
+  answers?: Record<string, string>;
+};
+
 type WorksheetPayload = {
   listName: string;
   generatedAt: string;
-  questions: WorksheetQuestion[];
-  definitions: { word: string; definition: string }[];
+  questions?: WorksheetQuestion[];
+  definitions?: LegacyDefinitionEntry[];
+  matching?: MatchingData;
 };
 
 export function WorksheetGenerator({ listId }: { listId: string }) {
@@ -37,6 +54,13 @@ export function WorksheetGenerator({ listId }: { listId: string }) {
       setLoading(false);
     }
   }
+
+  const questions = Array.isArray(data?.questions) ? data.questions : [];
+  const matchingWords = Array.isArray(data?.matching?.words) ? data.matching.words : [];
+  const matchingDefinitions = Array.isArray(data?.matching?.definitions) ? data.matching.definitions : [];
+  const legacyDefinitions = Array.isArray(data?.definitions) ? data.definitions : [];
+  const hasMatchingActivity = matchingWords.length > 0 || matchingDefinitions.length > 0;
+  const hasLegacyDefinitions = legacyDefinitions.length > 0;
 
   return (
     <section className="card p-4">
@@ -75,31 +99,71 @@ export function WorksheetGenerator({ listId }: { listId: string }) {
           <p className="text-xs text-slate-500">Generated: {new Date(data.generatedAt).toLocaleString()}</p>
           <div>
             <h4 className="font-semibold text-slate-900">Activity 1: Spelling Questions</h4>
-            <ol className="mt-2 space-y-3">
-              {data.questions.map((question, index) => (
-                <li key={`${question.word}-${index}`} className="rounded-lg border border-slate-200 p-3">
-                  <p className="mb-2 font-medium">{index + 1}. Select the correct spelling:</p>
-                  <div className="grid gap-1 sm:grid-cols-2">
-                    {question.options.map((option) => (
-                      <span key={`${question.word}-${option}`} className="rounded border border-slate-200 px-2 py-1">
-                        {option}
-                      </span>
-                    ))}
-                  </div>
-                </li>
-              ))}
-            </ol>
+            {questions.length > 0 ? (
+              <ol className="mt-2 space-y-3">
+                {questions.map((question, index) => (
+                  <li key={`${question.word}-${index}`} className="rounded-lg border border-slate-200 p-3">
+                    <p className="mb-2 font-medium">{index + 1}. Select the correct spelling:</p>
+                    <div className="grid gap-1 sm:grid-cols-2">
+                      {(Array.isArray(question.options) ? question.options : []).map((option) => (
+                        <span key={`${question.word}-${option}`} className="rounded border border-slate-200 px-2 py-1">
+                          {option}
+                        </span>
+                      ))}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="mt-2 text-slate-500">No spelling questions available.</p>
+            )}
           </div>
           <div>
-            <h4 className="font-semibold text-slate-900">Activity 2: Definitions</h4>
-            <ul className="mt-2 space-y-2">
-              {data.definitions.map((entry, index) => (
-                <li key={`${entry.word}-${index}`} className="rounded-lg border border-slate-200 p-3">
-                  <p className="font-medium">{entry.word}</p>
-                  <p className="text-slate-600">{entry.definition}</p>
-                </li>
-              ))}
-            </ul>
+            <h4 className="font-semibold text-slate-900">Activity 2: Match Words to Definitions</h4>
+            {hasMatchingActivity ? (
+              <div className="mt-2 grid gap-4 lg:grid-cols-2">
+                <div>
+                  <h5 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Words</h5>
+                  {matchingWords.length > 0 ? (
+                    <ol className="mt-2 space-y-2">
+                      {matchingWords.map((word, index) => (
+                        <li key={`${word}-${index}`} className="rounded-lg border border-slate-200 p-3">
+                          <span className="font-medium">{index + 1}.</span> {word}
+                        </li>
+                      ))}
+                    </ol>
+                  ) : (
+                    <p className="mt-2 text-slate-500">No words available.</p>
+                  )}
+                </div>
+                <div>
+                  <h5 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Definitions</h5>
+                  {matchingDefinitions.length > 0 ? (
+                    <ul className="mt-2 space-y-2">
+                      {matchingDefinitions.map((entry, index) => (
+                        <li key={`${entry.letter}-${index}`} className="rounded-lg border border-slate-200 p-3">
+                          <p className="font-medium">{entry.letter}.</p>
+                          <p className="text-slate-600">{entry.definition}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-2 text-slate-500">No definitions available.</p>
+                  )}
+                </div>
+              </div>
+            ) : hasLegacyDefinitions ? (
+              <ul className="mt-2 space-y-2">
+                {legacyDefinitions.map((entry, index) => (
+                  <li key={`${entry.word}-${index}`} className="rounded-lg border border-slate-200 p-3">
+                    <p className="font-medium">{entry.word}</p>
+                    <p className="text-slate-600">{entry.definition}</p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-slate-500">No matching activity available.</p>
+            )}
           </div>
         </div>
       ) : null}

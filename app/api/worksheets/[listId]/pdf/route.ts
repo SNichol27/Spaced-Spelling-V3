@@ -51,7 +51,7 @@ export async function GET(
     return NextResponse.json({ error: wordsError.message }, { status: 400 });
   }
 
-  const worksheet = await buildWorksheet(words ?? []);
+  const worksheet = await buildWorksheet(words ?? [], process.env.OPENAI_API_KEY ?? '');
 
   const document =
     type === 'answer'

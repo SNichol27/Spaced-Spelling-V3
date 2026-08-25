@@ -5,15 +5,44 @@ import { createRouteHandlerSupabaseClient } from '@/lib/supabase-server';
 import { buildWorksheet } from '@/lib/worksheet';
 import { AnswerKeyDocument, WorksheetDocument } from '@/components/pdf-documents';
 
+export const runtime = 'nodejs';
 // Allow up to 60 seconds for worksheet generation + PDF rendering on Vercel
 export const maxDuration = 60;
+
+type PdfType = 'answer' | 'worksheet';
+
+function resolvePdfType(rawType: string | null): PdfType | null {
+  if (!rawType || rawType === 'worksheet') return 'worksheet';
+  if (rawType === 'answer') return 'answer';
+  return null;
+}
+
+function buildSafePdfFilename(listName: string, type: PdfType) {
+  const normalized = listName
+    .trim()
+    .replace(/[\u0000-\u001f\u007f"*/:<>?\\|]/g, '-')
+    .replace(/\s+/g, ' ')
+    .replace(/-+/g, '-')
+    .slice(0, 80);
+  const baseName = (normalized || 'worksheet').replace(/[^\x20-\x7e]/g, '').trim() || 'worksheet';
+  return `${baseName}-${type}.pdf`;
+}
 
 export async function GET(
   request: NextRequest,
   context: { params: { listId: string } }
 ) {
+  const rawType = request.nextUrl.searchParams.get('type');
+  const type = resolvePdfType(rawType);
+
+  if (!type) {
+    return NextResponse.json(
+      { error: 'Invalid export type. Use "worksheet" or "answer".' },
+      { status: 400 }
+    );
+  }
+
   try {
-    const type = request.nextUrl.searchParams.get('type') === 'answer' ? 'answer' : 'worksheet';
     const supabase = createRouteHandlerSupabaseClient();
     const {
       data: { user }
@@ -49,10 +78,15 @@ export async function GET(
     const { data: words, error: wordsError } = await supabase
       .from('spelling_words')
       .select('word, definition')
-      .eq('spelling_list_id', context.params.listId);
+      .eq('spelling_list_id', listRow.id)
+      .order('created_at', { ascending: true });
 
     if (wordsError) {
       return NextResponse.json({ error: wordsError.message }, { status: 400 });
+    }
+
+    if (!words || words.length === 0) {
+      return NextResponse.json({ error: 'No words found for this list' }, { status: 400 });
     }
 
     const worksheet = await buildWorksheet(words ?? [], process.env.OPENAI_API_KEY ?? '');
@@ -73,15 +107,25 @@ export async function GET(
           });
 
     const pdfBuffer = await renderToBuffer(document as React.ReactElement);
+    const fileName = buildSafePdfFilename(listRow.name, type);
+    const encodedFileName = encodeURIComponent(fileName);
 
     return new NextResponse(new Uint8Array(pdfBuffer), {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${listRow.name}-${type}.pdf"`
+        'Content-Disposition': `attachment; filename="${fileName}"; filename*=UTF-8''${encodedFileName}`,
+        'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff'
       }
     });
   } catch (err) {
-    console.error('[pdf/route] PDF generation failed:', err instanceof Error ? err.message : err, err instanceof Error ? err.stack : '');
+    console.error('[pdf/route] PDF generation failed', {
+      listId: context.params.listId,
+      type,
+      message: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined,
+      nodeVersion: process.version
+    });
     return NextResponse.json(
       { error: 'Failed to generate PDF. Please try again.' },
       { status: 500 }

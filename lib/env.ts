@@ -1,7 +1,10 @@
 function readEnv(name: string): string {
   const value = process.env[name];
   if (!value) {
-    throw new Error(`Missing environment variable: ${name}`);
+    // Log at startup so the missing var is visible in Vercel logs, but don't
+    // crash the entire process — individual routes will handle missing values.
+    console.error(`[env] Missing environment variable: ${name}`);
+    return '';
   }
   return value;
 }

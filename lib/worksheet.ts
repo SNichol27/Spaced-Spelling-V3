@@ -187,19 +187,20 @@ export async function getDefinition(word: string, openAiKey: string): Promise<st
 export async function buildWorksheet(words: WorksheetWord[], openAiKey: string) {
   const questionSource = shuffle(words);
 
-  const questions: WorksheetQuestion[] = [];
-  for (const item of questionSource) {
-    const distractors = generatePhoneticMisspellings(item.word);
-    const options = shuffle([item.word, ...distractors]).slice(0, 4);
-    const generatedDefinition = await getDefinition(item.word, openAiKey);
+  const questions: WorksheetQuestion[] = await Promise.all(
+    questionSource.map(async (item) => {
+      const distractors = generatePhoneticMisspellings(item.word);
+      const options = shuffle([item.word, ...distractors]).slice(0, 4);
+      const generatedDefinition = await getDefinition(item.word, openAiKey);
 
-    questions.push({
-      word: item.word,
-      definition: generatedDefinition || item.definition || fallbackDefinition,
-      options,
-      answer: item.word
-    });
-  }
+      return {
+        word: item.word,
+        definition: generatedDefinition || item.definition || fallbackDefinition,
+        options,
+        answer: item.word
+      };
+    })
+  );
 
   // Build Activity 2 matching data:
   // words in original shuffled order (numbered), definitions shuffled independently (lettered)

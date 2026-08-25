@@ -12,6 +12,17 @@ export type WorksheetQuestion = {
   answer: string;
 };
 
+export type MatchingDefinition = {
+  letter: string;
+  definition: string;
+};
+
+export type MatchingData = {
+  words: string[];
+  definitions: MatchingDefinition[];
+  answers: Record<string, string>;
+};
+
 const fallbackDefinition = 'A word used in reading and writing.';
 
 function preserveWordCasing(sourceWord: string, candidate: string): string {
@@ -190,28 +201,42 @@ export async function buildWorksheet(words: WorksheetWord[], openAiKey: string) 
     });
   }
 
-  const definitions = shuffle(questions).map((item) => ({
-    word: item.word,
-    definition: item.definition
+  // Build Activity 2 matching data:
+  // words in original shuffled order (numbered), definitions shuffled independently (lettered)
+  const wordsList = questions.map((q) => q.word);
+  const shuffledDefs = shuffle(
+    questions.map((q, i) => ({ letter: '', definition: q.definition, wordIndex: i }))
+  ).map((entry, i) => ({
+    ...entry,
+    letter: String.fromCharCode(65 + i) // A, B, C, ...
   }));
+
+  // Answer mapping: letter -> word
+  const matchingAnswers: Record<string, string> = {};
+  for (const entry of shuffledDefs) {
+    matchingAnswers[entry.letter] = wordsList[entry.wordIndex];
+  }
+
+  const matching = {
+    words: wordsList,
+    definitions: shuffledDefs.map((e) => ({ letter: e.letter, definition: e.definition })),
+    answers: matchingAnswers
+  };
 
   return {
     generatedAt: new Date().toISOString(),
     questions,
-    definitions,
+    matching,
     activities: [
       {
-        type: 'multiple-choice',
-        title: 'Activity 1: Multiple Choice Spelling',
+        type: 'select-correct-spelling',
+        title: 'Activity 1: Select Correct Spelling',
         content: questions
       },
       {
         type: 'match-definitions',
         title: 'Activity 2: Match Words to Definitions',
-        content: {
-          words: definitions.map((entry) => entry.word),
-          definitions: definitions.map((entry) => entry.definition)
-        }
+        content: matching
       }
     ]
   };

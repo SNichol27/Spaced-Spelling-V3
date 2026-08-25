@@ -53,7 +53,7 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
           .order('created_at', { ascending: false }),
         supabase
           .from('reviews')
-          .select('id, spelling_list_id, review_number, scheduled_week, status, completed_at, spelling_lists(name)')
+          .select('id, spelling_list_id, review_number, scheduled_week, status, completed_at')
           .eq('class_id', selectedClassId)
           .order('scheduled_week', { ascending: true })
       ])
@@ -61,6 +61,8 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
 
   if (listsResult.error) throw new Error(listsResult.error.message);
   if (reviewsResult.error) throw new Error(reviewsResult.error.message);
+
+  const listNameById = new Map((listsResult.data ?? []).map((list) => [list.id, list.name]));
 
   const dueReviews = (reviewsResult.data ?? []).filter(
     (review) => review.status === 'pending' && review.scheduled_week <= currentWeek
@@ -201,11 +203,12 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
               <ReviewColumn
                 title="Due"
                 reviews={dueReviews}
+                listNameById={listNameById}
                 action={markReviewCompleteAction}
                 buttonLabel="Mark Complete"
               />
-              <ReviewColumn title="Upcoming" reviews={upcomingReviews} />
-              <ReviewColumn title="Completed" reviews={completedReviews} />
+              <ReviewColumn title="Upcoming" reviews={upcomingReviews} listNameById={listNameById} />
+              <ReviewColumn title="Completed" reviews={completedReviews} listNameById={listNameById} />
             </div>
           </section>
 
@@ -257,21 +260,23 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
 
 type ReviewItem = {
   id: string;
+  spelling_list_id: string;
   review_number: number;
   scheduled_week: number;
   status: 'pending' | 'completed';
   completed_at: string | null;
-  spelling_lists: { name: string } | null;
 };
 
 function ReviewColumn({
   title,
   reviews,
+  listNameById,
   action,
   buttonLabel
 }: {
   title: string;
   reviews: ReviewItem[];
+  listNameById: Map<string, string>;
   action?: (formData: FormData) => Promise<void>;
   buttonLabel?: string;
 }) {
@@ -283,7 +288,7 @@ function ReviewColumn({
         {reviews.map((review) => (
           <li key={review.id} className="rounded-lg bg-white p-3 text-sm shadow-sm">
             <p className="font-medium text-slate-900">
-              {review.spelling_lists?.name ?? 'Spelling List'} – Review #{review.review_number}
+              {listNameById.get(review.spelling_list_id) ?? 'Spelling List'} – Review #{review.review_number}
             </p>
             <p className="text-slate-600">Week {review.scheduled_week}</p>
             {review.status === 'completed' && review.completed_at ? (

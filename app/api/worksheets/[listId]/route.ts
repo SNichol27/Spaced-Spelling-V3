@@ -17,12 +17,22 @@ export async function GET(
 
   const { data: listRow, error: listError } = await supabase
     .from('spelling_lists')
-    .select('id, name, class_id, classes!inner(teacher_id)')
+    .select('id, name, class_id')
     .eq('id', context.params.listId)
-    .eq('classes.teacher_id', user.id)
     .single();
 
   if (listError || !listRow) {
+    return NextResponse.json({ error: 'List not found' }, { status: 404 });
+  }
+
+  const { data: classRow, error: classError } = await supabase
+    .from('classes')
+    .select('id')
+    .eq('id', listRow.class_id)
+    .eq('teacher_id', user.id)
+    .single();
+
+  if (classError || !classRow) {
     return NextResponse.json({ error: 'List not found' }, { status: 404 });
   }
 

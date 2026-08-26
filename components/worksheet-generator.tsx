@@ -141,6 +141,7 @@ export function WorksheetGenerator({ listId }: { listId: string }) {
                           </span>
                         ))}
                       </div>
+                      <p className="mt-4 font-medium text-slate-800">Correct Spelling: _________________</p>
                     </li>
                   ))}
                 </ol>

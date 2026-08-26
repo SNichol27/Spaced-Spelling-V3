@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { downloadElementAsPdf } from '@/lib/pdf-download';
 
 type WorksheetQuestion = {
   word: string;
@@ -58,9 +57,7 @@ export function WorksheetGenerator({ listId }: { listId: string }) {
   }
 
   async function downloadPdf(type: 'worksheet' | 'answer') {
-    const elementId = type === 'worksheet' ? 'worksheet-content' : 'answer-key-content';
-    const element = document.getElementById(elementId);
-    if (!element) {
+    if (!data) {
       setError('No content to export. Please generate the worksheet first.');
       return;
     }
@@ -69,8 +66,17 @@ export function WorksheetGenerator({ listId }: { listId: string }) {
     setPdfLoading(type);
 
     try {
-      const listName = data?.listName ?? 'worksheet';
-      await downloadElementAsPdf(element, `${listName}-${type}.pdf`);
+      const response = await fetch(`/api/worksheets/${listId}/pdf?type=${type}`);
+      if (!response.ok) {
+        throw new Error('Failed to generate PDF.');
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${data.listName ?? 'worksheet'}-${type}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
     } catch {
       setError('Failed to generate PDF. Please try again.');
     } finally {

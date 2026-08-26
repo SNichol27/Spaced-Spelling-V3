@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { downloadElementAsPdf } from '@/lib/pdf-download';
 
 type WorksheetQuestion = {
   word: string;
@@ -37,6 +38,7 @@ export function WorksheetGenerator({ listId }: { listId: string }) {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<WorksheetPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pdfLoading, setPdfLoading] = useState<'worksheet' | 'answer' | null>(null);
 
   async function generate() {
     setLoading(true);
@@ -52,6 +54,25 @@ export function WorksheetGenerator({ listId }: { listId: string }) {
       setError(err instanceof Error ? err.message : 'Failed to generate worksheet.');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function downloadPdf(type: 'worksheet' | 'answer') {
+    const elementId = type === 'worksheet' ? 'worksheet-content' : 'answer-key-content';
+    const element = document.getElementById(elementId);
+    if (!element) {
+      setError('No content to export. Please generate the worksheet first.');
+      return;
+    }
+    setPdfLoading(type);
+    try {
+      const listName = data?.listName ?? 'worksheet';
+      const filename = `${listName}-${type}.pdf`;
+      await downloadElementAsPdf(element, filename);
+    } catch {
+      setError('Failed to generate PDF. Please try again.');
+    } finally {
+      setPdfLoading(null);
     }
   }
 
@@ -75,27 +96,28 @@ export function WorksheetGenerator({ listId }: { listId: string }) {
           >
             {loading ? 'Generating…' : 'Generate Worksheet'}
           </button>
-          <a
-            href={`/api/worksheets/${listId}/pdf?type=worksheet`}
-            target="_blank"
-            rel="noreferrer"
-            className="rounded-lg border border-indigo-300 px-3 py-2 text-sm text-indigo-700 hover:bg-indigo-50"
+          <button
+            type="button"
+            onClick={() => downloadPdf('worksheet')}
+            disabled={!data || pdfLoading !== null}
+            className="rounded-lg border border-indigo-300 px-3 py-2 text-sm text-indigo-700 hover:bg-indigo-50 disabled:opacity-60"
           >
-            Export Worksheet PDF
-          </a>
-          <a
-            href={`/api/worksheets/${listId}/pdf?type=answer`}
-            target="_blank"
-            rel="noreferrer"
-            className="rounded-lg border border-emerald-300 px-3 py-2 text-sm text-emerald-700 hover:bg-emerald-50"
+            {pdfLoading === 'worksheet' ? 'Downloading…' : 'Download Worksheet PDF'}
+          </button>
+          <button
+            type="button"
+            onClick={() => downloadPdf('answer')}
+            disabled={!data || pdfLoading !== null}
+            className="rounded-lg border border-emerald-300 px-3 py-2 text-sm text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
           >
-            Export Answer Key PDF
-          </a>
+            {pdfLoading === 'answer' ? 'Downloading…' : 'Download Answer Key PDF'}
+          </button>
         </div>
       </div>
       {error ? <p className="mt-3 text-sm text-rose-600">{error}</p> : null}
       {data ? (
-        <div className="mt-4 space-y-4 text-sm text-slate-700">
+        <>
+        <div id="worksheet-content" className="mt-4 space-y-4 text-sm text-slate-700">
           <p className="text-xs text-slate-500">Generated: {new Date(data.generatedAt).toLocaleString()}</p>
           <div>
             <h4 className="font-semibold text-slate-900">Activity 1: Spelling Questions</h4>
@@ -166,6 +188,40 @@ export function WorksheetGenerator({ listId }: { listId: string }) {
             )}
           </div>
         </div>
+        <div id="answer-key-content" className="mt-4 space-y-4 text-sm text-slate-700">
+          <p className="font-bold text-slate-900">Answer Key</p>
+          <p className="text-xs text-slate-500">Generated: {new Date(data.generatedAt).toLocaleString()}</p>
+          <div>
+            <h4 className="font-semibold text-slate-900">Activity 1: Spelling Answers</h4>
+            {questions.length > 0 ? (
+              <ol className="mt-2 space-y-2">
+                {questions.map((question, index) => (
+                  <li key={`ans-${question.word}-${index}`} className="rounded-lg border border-slate-200 p-3">
+                    <span className="font-medium">{index + 1}.</span>{' '}
+                    <span className="text-emerald-700 font-semibold">{question.answer}</span>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="mt-2 text-slate-500">No answers available.</p>
+            )}
+          </div>
+          {hasMatchingActivity && data?.matching?.answers ? (
+            <div>
+              <h4 className="font-semibold text-slate-900">Activity 2: Matching Answers</h4>
+              <ul className="mt-2 space-y-2">
+                {matchingWords.map((word, index) => (
+                  <li key={`match-ans-${word}-${index}`} className="rounded-lg border border-slate-200 p-3">
+                    <span className="font-medium">{index + 1}. {word}</span>{' '}
+                    &rarr;{' '}
+                    <span className="text-emerald-700">{data.matching?.answers?.[word] ?? ''}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+        </>
       ) : null}
     </section>
   );

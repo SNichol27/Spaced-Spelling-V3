@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { downloadElementAsPdf } from '@/lib/pdf-download';
 
 type WorksheetQuestion = {
@@ -38,7 +38,7 @@ export function WorksheetGenerator({ listId }: { listId: string }) {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<WorksheetPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [pdfLoading, setPdfLoading] = useState<'worksheet' | 'answer' | null>(null);
+  const lastAutoDownloadGeneratedAt = useRef<string | null>(null);
 
   async function generate() {
     setLoading(true);
@@ -57,24 +57,34 @@ export function WorksheetGenerator({ listId }: { listId: string }) {
     }
   }
 
-  async function downloadPdf(type: 'worksheet' | 'answer') {
-    const elementId = type === 'worksheet' ? 'worksheet-content' : 'answer-key-content';
-    const element = document.getElementById(elementId);
-    if (!element) {
-      setError('No content to export. Please generate the worksheet first.');
-      return;
+  useEffect(() => {
+    if (!data || lastAutoDownloadGeneratedAt.current === data.generatedAt) return;
+    lastAutoDownloadGeneratedAt.current = data.generatedAt;
+    const payload = data;
+
+    async function autoDownloadPdfs() {
+      await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
+
+      const worksheetElement = document.getElementById('worksheet-content');
+      const answerKeyElement = document.getElementById('answer-key-content');
+      if (!worksheetElement || !answerKeyElement) return;
+
+      const listName = payload.listName ?? 'worksheet';
+      try {
+        await downloadElementAsPdf(worksheetElement, `${listName}-worksheet.pdf`);
+      } catch (err) {
+        console.error('Failed to auto-download worksheet PDF', err);
+      }
+
+      try {
+        await downloadElementAsPdf(answerKeyElement, `${listName}-answer-key.pdf`);
+      } catch (err) {
+        console.error('Failed to auto-download answer key PDF', err);
+      }
     }
-    setPdfLoading(type);
-    try {
-      const listName = data?.listName ?? 'worksheet';
-      const filename = `${listName}-${type}.pdf`;
-      await downloadElementAsPdf(element, filename);
-    } catch {
-      setError('Failed to generate PDF. Please try again.');
-    } finally {
-      setPdfLoading(null);
-    }
-  }
+
+    void autoDownloadPdfs();
+  }, [data]);
 
   const questions = Array.isArray(data?.questions) ? data.questions : [];
   const matchingWords = Array.isArray(data?.matching?.words) ? data.matching.words : [];
@@ -96,24 +106,11 @@ export function WorksheetGenerator({ listId }: { listId: string }) {
           >
             {loading ? 'Generating…' : 'Generate Worksheet'}
           </button>
-          <button
-            type="button"
-            onClick={() => downloadPdf('worksheet')}
-            disabled={!data || pdfLoading !== null}
-            className="rounded-lg border border-indigo-300 px-3 py-2 text-sm text-indigo-700 hover:bg-indigo-50 disabled:opacity-60"
-          >
-            {pdfLoading === 'worksheet' ? 'Downloading…' : 'Download Worksheet PDF'}
-          </button>
-          <button
-            type="button"
-            onClick={() => downloadPdf('answer')}
-            disabled={!data || pdfLoading !== null}
-            className="rounded-lg border border-emerald-300 px-3 py-2 text-sm text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
-          >
-            {pdfLoading === 'answer' ? 'Downloading…' : 'Download Answer Key PDF'}
-          </button>
         </div>
       </div>
+      <p className="mt-2 text-xs text-slate-500">
+        PDFs download automatically after you generate a worksheet.
+      </p>
       {error ? <p className="mt-3 text-sm text-rose-600">{error}</p> : null}
       {data ? (
         <>

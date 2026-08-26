@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import PDFDocument from 'pdfkit';
 import { createRouteHandlerSupabaseClient } from '@/lib/supabase-server';
 import { buildWorksheet } from '@/lib/worksheet';
+import { env } from '@/lib/env';
 import type { MatchingData, WorksheetQuestion } from '@/lib/worksheet';
 
 // Page constants (A4 in points)
@@ -211,7 +212,7 @@ export async function GET(
       return NextResponse.json({ error: wordsError.message }, { status: 400 });
     }
 
-    const worksheet = await buildWorksheet(words ?? [], process.env.OPENAI_API_KEY ?? '');
+    const worksheet = await buildWorksheet(words ?? [], env.openAiApiKey);
 
     const chunks: Buffer[] = [];
     await new Promise<void>((resolve, reject) => {

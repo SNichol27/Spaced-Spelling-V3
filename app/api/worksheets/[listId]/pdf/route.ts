@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import PDFDocument from 'pdfkit';
 import { createRouteHandlerSupabaseClient } from '@/lib/supabase-server';
-import { buildWorksheet } from '@/lib/worksheet';
-import { env } from '@/lib/env';
 import type { MatchingData, WorksheetQuestion } from '@/lib/worksheet';
+
+type WorksheetRecord = {
+  questions: WorksheetQuestion[];
+  matching: MatchingData;
+  generated_at: string;
+};
 
 // Page constants (A4 in points)
 const PAGE_WIDTH = 595.28;
@@ -203,16 +207,34 @@ export async function GET(
       return NextResponse.json({ error: 'List not found' }, { status: 404 });
     }
 
-    const { data: words, error: wordsError } = await supabase
-      .from('spelling_words')
-      .select('word, definition')
-      .eq('spelling_list_id', context.params.listId);
+    const { data: worksheetRowRaw, error: worksheetError } = await supabase
+      .from('worksheets')
+      .select('questions, matching, generated_at, created_at')
+      .eq('list_id', listRow.id)
+      .eq('teacher_id', user.id)
+      .order('generated_at', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    if (wordsError) {
-      return NextResponse.json({ error: wordsError.message }, { status: 400 });
+    if (worksheetError) {
+      console.error('Failed to load worksheet for PDF generation', {
+        listId: listRow.id,
+        teacherId: user.id,
+        error: worksheetError.message
+      });
+      return NextResponse.json({ error: 'Failed to load worksheet.' }, { status: 500 });
     }
 
-    const worksheet = await buildWorksheet(words ?? [], env.openAiApiKey);
+    const worksheet = worksheetRowRaw as WorksheetRecord | null;
+
+    if (!worksheet) {
+      console.warn('No stored worksheet found for PDF generation', {
+        listId: listRow.id,
+        teacherId: user.id
+      });
+      return NextResponse.json({ error: 'Worksheet not found. Please generate it first.' }, { status: 404 });
+    }
 
     const chunks: Buffer[] = [];
     await new Promise<void>((resolve, reject) => {
@@ -222,9 +244,9 @@ export async function GET(
       doc.on('error', reject);
 
       if (type === 'answer') {
-        buildAnswerKeyPdf(doc, listRow.name, worksheet.generatedAt, worksheet.questions, worksheet.matching);
+        buildAnswerKeyPdf(doc, listRow.name, worksheet.generated_at, worksheet.questions, worksheet.matching);
       } else {
-        buildWorksheetPdf(doc, listRow.name, worksheet.generatedAt, worksheet.questions, worksheet.matching);
+        buildWorksheetPdf(doc, listRow.name, worksheet.generated_at, worksheet.questions, worksheet.matching);
       }
 
       doc.end();
@@ -239,7 +261,10 @@ export async function GET(
       }
     });
   } catch (err) {
-    console.error('PDF generation error:', err);
+    console.error('PDF generation error:', {
+      listId: context.params.listId,
+      error: err
+    });
     return NextResponse.json({ error: 'Failed to generate PDF' }, { status: 500 });
   }
 }

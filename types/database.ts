@@ -1,5 +1,21 @@
 export type ScheduleType = 'fixed' | 'expanding';
 
+type WorksheetQuestionRow = {
+  word: string;
+  definition: string;
+  options: string[];
+  answer: string;
+};
+
+type WorksheetMatchingRow = {
+  words: string[];
+  definitions: Array<{
+    letter: string;
+    definition: string;
+  }>;
+  answers: Record<string, string>;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -104,6 +120,36 @@ export type Database = {
           scheduled_week?: number;
           status?: 'pending' | 'completed';
           completed_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      worksheets: {
+        Row: {
+          id: string;
+          list_id: string;
+          teacher_id: string;
+          questions: WorksheetQuestionRow[];
+          matching: WorksheetMatchingRow;
+          generated_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          list_id: string;
+          teacher_id: string;
+          questions: WorksheetQuestionRow[];
+          matching: WorksheetMatchingRow;
+          generated_at?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          list_id?: string;
+          teacher_id?: string;
+          questions?: WorksheetQuestionRow[];
+          matching?: WorksheetMatchingRow;
+          generated_at?: string;
           created_at?: string;
         };
         Relationships: [];

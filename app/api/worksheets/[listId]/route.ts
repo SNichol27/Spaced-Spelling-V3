@@ -48,10 +48,35 @@ export async function GET(
     return NextResponse.json({ error: wordsError.message }, { status: 400 });
   }
 
-  const worksheet = await buildWorksheet(words ?? [], process.env.OPENAI_API_KEY ?? '');
+  try {
+    const worksheet = await buildWorksheet(words ?? [], process.env.OPENAI_API_KEY ?? '');
+    const { error: saveError } = await supabase.from('worksheets').insert({
+      list_id: listRow.id,
+      teacher_id: user.id,
+      questions: worksheet.questions,
+      matching: worksheet.matching,
+      generated_at: worksheet.generatedAt
+    });
 
-  return NextResponse.json({
-    listName: listRow.name,
-    ...worksheet
-  });
+    if (saveError) {
+      console.error('Failed to save generated worksheet', {
+        listId: listRow.id,
+        teacherId: user.id,
+        error: saveError.message
+      });
+      return NextResponse.json({ error: 'Failed to save worksheet.' }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      listName: listRow.name,
+      ...worksheet
+    });
+  } catch (error) {
+    console.error('Worksheet generation failed', {
+      listId: listRow.id,
+      teacherId: user.id,
+      error
+    });
+    return NextResponse.json({ error: 'Failed to generate worksheet.' }, { status: 500 });
+  }
 }

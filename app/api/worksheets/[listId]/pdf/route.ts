@@ -92,11 +92,7 @@ export async function GET(
         yPosition = 15;
       }
       doc.setFontSize(fontSize);
-      if (isBold) {
-        doc.setFont(undefined, 'bold');
-      } else {
-        doc.setFont(undefined, 'normal');
-      }
+      doc.setFont('Helvetica', isBold ? 'bold' : 'normal');
       const lines = doc.splitTextToSize(text, maxWidth);
       doc.text(lines, margin, yPosition);
       yPosition += lines.length * (fontSize / 2.8) + 2;

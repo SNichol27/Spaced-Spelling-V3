@@ -201,6 +201,24 @@ export default async function DashboardPage({ searchParams }: DashboardProps) {
               </div>
             </div>
 
+            <div className="mt-3 flex items-center gap-2">
+              <span className="text-sm text-slate-700 font-medium">Go to Week:</span>
+              <form className="flex items-center gap-2">
+                <input type="hidden" name="classId" value={selectedClassId ?? ''} />
+                <input
+                  type="number"
+                  name="week"
+                  min="1"
+                  max="40"
+                  placeholder="Week #"
+                  className="w-20 rounded border border-slate-300 px-2 py-1 text-sm"
+                />
+                <button className="rounded border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100">
+                  Go
+                </button>
+              </form>
+            </div>
+
             <div className="mt-4 grid gap-4 xl:grid-cols-2">
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                 <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Due</h3>
